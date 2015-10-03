@@ -125,6 +125,7 @@ class PBX {
       return api('originate '
                                   '{ignore_early_media=true,'
                                   '${agentChan}=true,'
+                                  'park_timeout=$_agentChantimeOut,'
                                   'origination_uuid=$new_call_uuid,'
                                   'originate_timeout=$_agentChantimeOut,'
                                   'origination_caller_id_name=$_callerID,'

@@ -198,6 +198,12 @@ abstract class Call {
     new shelf.Response.ok(JSON.encode(Model.CallList.instance));
 
 
+  static void _userStateUnknown (ORModel.User user) =>
+      Model.UserStatusList.instance.update(user.ID, ORModel.UserState.Unknown);
+
+  static void _userStateDialing (ORModel.User user) =>
+      Model.UserStatusList.instance.update(user.ID, ORModel.UserState.Dialing);
+
   /**
    * Originate a new call by first creating a parked phone channel to the
    * agent and then perform the orgination in the background.
@@ -211,9 +217,6 @@ abstract class Call {
     final String port = shelf_route.getPathParameter(request, 'port');
     ORModel.User user;
     Model.Peer peer;
-
-    void setUserStateUnknown () => Model.UserStatusList.instance.update
-        (user.ID, ORModel.UserState.Unknown);
 
     if (host != null) {
       extension = '$extension@$host:$port';
@@ -252,19 +255,18 @@ abstract class Call {
 
     /// The user has not registered its peer to transfer the call to. Abort.
     if (peer == null || !peer.registered) {
-      setUserStateUnknown ();
+      _userStateUnknown(user);
       return _clientError('User with ${user.ID} has no peer available');
     }
 
     /// The user has no reachable phone to transfer the call to. Abort.
     if (_phoneUnreachable(user)) {
-      setUserStateUnknown ();
+      _userStateUnknown(user);
       return _clientError('Phone is not ready. ${_stateString(user)}');
     }
 
     /// Update the user state
-    Model.UserStatusList.instance.update
-      (user.ID, ORModel.UserState.Dialing);
+    _userStateDialing(user);
 
     bool isSpeaking (ORModel.Call call) =>
         call.state == ORModel.CallState.Speaking;
@@ -280,7 +282,7 @@ abstract class Call {
     catch (error, stackTrace) {
       final String msg = 'Failed to park user\'s active calls';
       log.severe(msg, error, stackTrace);
-      setUserStateUnknown ();
+      _userStateUnknown(user);
 
       return _serverError(msg);
     }
@@ -291,13 +293,13 @@ abstract class Call {
       uuid = await Controller.PBX.createAgentChannel(user);
     }
     on Controller.CallRejected {
-      setUserStateUnknown ();
+      _userStateUnknown(user);
 
       return _clientError('Phone is not reachable'
       ' (call rejected). Check configuration.');
     }
     on Controller.NoAnswer {
-      setUserStateUnknown ();
+      _userStateUnknown(user);
 
       return _clientError('Phone is not reachable'
         ' (no answer). Check autoanswer.');
@@ -305,7 +307,7 @@ abstract class Call {
     catch (error, stackTrace) {
       final String msg = 'Failed to create agent channel';
       log.severe(msg, error, stackTrace);
-      setUserStateUnknown ();
+      _userStateUnknown(user);
 
       return _serverError(msg);
     }
@@ -333,7 +335,7 @@ abstract class Call {
       final String msg = 'Failed to get call channel';
       log.severe(msg, error, stackTrace);
 
-      setUserStateUnknown ();
+      _userStateUnknown(user);
 
       return _serverError(msg);
     }
@@ -359,7 +361,7 @@ abstract class Call {
     catch (error, stackTrace) {
       final String msg = 'Failed to create agent channel';
       log.severe(msg, error, stackTrace);
-      setUserStateUnknown ();
+      _userStateUnknown(user);
 
       return _serverError(msg);
     }
@@ -411,9 +413,8 @@ abstract class Call {
         return new shelf.Response.ok(reply);
 
       }).catchError((error, stackTrace) {
-        Model.UserStatusList.instance.update(
-            user.ID,
-            ORModel.UserState.Unknown);
+        _userStateUnknown(user);
+
         log.severe(error, stackTrace);
         return new shelf.Response.internalServerError();
       });
@@ -434,12 +435,21 @@ abstract class Call {
     });
   }
 
+  /**
+   *
+   */
   static shelf.Response _clientError(String reason) =>
       new shelf.Response(400, body : reason);
 
+  /**
+   *
+   */
   static shelf.Response _serverError(String reason) =>
       new shelf.Response(500, body : reason);
 
+  /**
+   *
+   */
   static bool _phoneUnreachable(ORModel.User user)  {
     /// Check user state. If the user is currently performing an action - or
     /// has an active channel - deny the request.
@@ -464,7 +474,6 @@ abstract class Call {
 
   /**
    * Pickup a specific call.
-   * TODO: Wait with parking until the channelcheck is done
    */
   static Future<shelf.Response> pickup(shelf.Request request) async {
 
@@ -495,11 +504,15 @@ abstract class Call {
 
     /// The user has not registered its peer to transfer the call to. Abort.
     if (peer == null || !peer.registered) {
+      _userStateUnknown(user);
+
       return _clientError('User with ${user.ID} has no peer available');
     }
 
     /// The user has no reachable phone to transfer the call to. Abort.
     if (_phoneUnreachable(user)) {
+      _userStateUnknown(user);
+
       return _clientError('Phone is not ready. ${_stateString(user)}');
     }
 
