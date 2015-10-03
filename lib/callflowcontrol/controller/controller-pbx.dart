@@ -38,7 +38,7 @@ class CallRejected extends PBXException {
   String toString() => "CallRejected: $message";
 }
 
-abstract class PBX {
+class PBX {
 
   static final Logger _log             = new Logger('${libraryName}.PBX');
   static const String _callerID        = '39990141';
@@ -54,10 +54,12 @@ abstract class PBX {
 
   static final Logger log = new Logger ('${libraryName}.PBX');
 
-  static ESL.Connection apiClient;
-  static ESL.Connection eventClient;
+  final ESL.Connection apiClient;
+  final ESL.Connection eventClient;
 
-  static Future<ESL.Response> api (String command) {
+  PBX(this.apiClient, this.eventClient);
+
+  Future<ESL.Response> api (String command) {
     return apiClient.api(command, timeoutSeconds: 20)
         .then((ESL.Response response) {
 
@@ -71,12 +73,12 @@ abstract class PBX {
     });
   }
 
-  static Future<ESL.Reply> bgapi (String command) {
-    return apiClient.bgapi(command).then((ESL.Reply response) {
+  Future<ESL.Reply> bgapi (String command) =>
+    apiClient.bgapi(command).then((ESL.Reply response) {
       log.finest('bgapi $command => ${response.content}');
       return response;
     });
-  }
+
   /**
    * Starts an origination in the PBX.
    *
@@ -84,7 +86,7 @@ abstract class PBX {
    *
    * Returns the UUID of the call.
    */
-  static Future<String> originate (String extension, int contactID, int receptionID, ORModel.User user) {
+  Future<String> originate (String extension, int contactID, int receptionID, ORModel.User user) {
     /// Tag the A-leg as a primitive origination channel.
     List<String> a_legvariables = ['${agentChan}=true'];
 
@@ -112,7 +114,7 @@ abstract class PBX {
    *
    * Returns the UUID of the new channel.
    */
-  static Future<String> createAgentChannel (ORModel.User user) =>
+  Future<String> createAgentChannel (ORModel.User user) =>
     api('create_uuid').then((ESL.Response response) {
       final String new_call_uuid = response.rawBody;
       final String destination = 'user/${user.peer}';
@@ -158,7 +160,7 @@ abstract class PBX {
      });
 
 
-  static Future transferUUIDToExtension
+  Future transferUUIDToExtension
     (String uuid, String extension, ORModel.User user) {
     return
       api
@@ -178,7 +180,7 @@ abstract class PBX {
    *
    * By first dialing the agent and then the recordingsmenu.
    */
-  static Future originateRecording (int receptionID, String recordExtension, String soundFilePath, ORModel.User user) {
+  Future originateRecording (int receptionID, String recordExtension, String soundFilePath, ORModel.User user) {
     List<String> variables = ['reception_id=${receptionID}',
                               'owner=${user.ID}',
                               'recordpath=${soundFilePath}'];
@@ -201,7 +203,7 @@ abstract class PBX {
    * This method is cleaner than the [originate] method, because this will return the future A-leg as call-id, but
    * will break the protocol as per 2014-06-24.
    */
-  static Future<String> originateOutboundFirst (String extension, int contactID, int receptionID, ORModel.User user) {
+  Future<String> originateOutboundFirst (String extension, int contactID, int receptionID, ORModel.User user) {
     List<String> variables = ['reception_id=${receptionID}',
                               'owner=${user.ID}',
                               'contact_id=${contactID}',
@@ -225,7 +227,7 @@ abstract class PBX {
   /**
    * Bridges two active calls.
    */
-  static Future bridge (ORModel.Call source, ORModel.Call destination) {
+  Future bridge (ORModel.Call source, ORModel.Call destination) {
     return api ('uuid_bridge ${source.ID} ${destination.ID}')
         .then((ESL.Response response) {
 
@@ -240,7 +242,7 @@ abstract class PBX {
   /**
    * Bridges two active calls.
    */
-  static Future bridgeChannel (String uuid, ORModel.Call destination) {
+  Future bridgeChannel (String uuid, ORModel.Call destination) {
 
     ESL.Response bridgeResponse;
 
@@ -258,7 +260,7 @@ abstract class PBX {
   /**
    * Transfers an active call to a user.
    */
-  static Future transfer (ORModel.Call source, String extension) {
+  Future transfer (ORModel.Call source, String extension) {
 
     ESL.Response transferResponse;
 
@@ -270,12 +272,12 @@ abstract class PBX {
   /**
    * Kills the active channel for a call.
    */
-  static Future hangup (ORModel.Call call) => killChannel(call.channel);
+  Future hangup (ORModel.Call call) => killChannel(call.channel);
 
   /**
    * Kills the active channel for a call.
    */
-  static Future killChannel (String uuid) =>
+  Future killChannel (String uuid) =>
     api('uuid_kill $uuid')
         .then((ESL.Response response) {
           if (response.status != ESL.Response.OK) {
@@ -287,14 +289,13 @@ abstract class PBX {
    * Parks a call in the parking lot for the user.
    * TODO: Log NO_ANSWER events and figure out why they are coming.
    */
-  static Future park (ORModel.Call call, ORModel.User user) {
-    return transfer(call, 'park');
-  }
+  Future park (ORModel.Call call, ORModel.User user) => transfer(call, 'park');
+
 
   /**
    * Loads the peer list from an [ESL.Response].
    */
-  static void _loadPeerListFromPacket (ESL.Response response) {
+  void _loadPeerListFromPacket (ESL.Response response) {
 
     bool peerIsInAcceptedContext(ESL.Peer peer) =>
       config.callFlowControl.peerContexts.contains(peer.context);
@@ -312,19 +313,19 @@ abstract class PBX {
   /**
    * Request a reload of peers.
    */
-  static Future loadPeers () => api('list_users')
+  Future loadPeers () => api('list_users')
     .then(_loadPeerListFromPacket);
 
   /**
    * Request a reload of channels
    */
-  static Future loadChannels() => api('show channels as json')
+  Future loadChannels() => api('show channels as json')
       .then(_loadChannelListFromPacket);
 
   /**
    * Loads the channel list from an [ESL.Response].
    */
-  static Future _loadChannelListFromPacket (ESL.Response response) {
+  Future _loadChannelListFromPacket (ESL.Response response) {
     Map responseBody = JSON.decode(response.rawBody);
     Iterable<String> channelUUIDs =
         responseBody.containsKey('rows')
@@ -367,6 +368,6 @@ abstract class PBX {
   /**
    * Attach a variable to a channel.
    */
-  static Future setVariable(String uuid, String identifier, String value) =>
+  Future setVariable(String uuid, String identifier, String value) =>
     api('uuid_setvar $uuid $identifier $value');
 }

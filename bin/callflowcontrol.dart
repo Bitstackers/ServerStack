@@ -35,6 +35,9 @@ void main(List<String> args) {
   Logger.root.level = config.callFlowControl.log.level;
   Logger.root.onRecord.listen(config.callFlowControl.log.onRecord);
 
+  Controller.PBX pbxController =
+      new Controller.PBX(new ESL.Connection(),new ESL.Connection());
+
   try {
     registerAndParseCommandlineArguments(args);
 
@@ -42,8 +45,8 @@ void main(List<String> args) {
       print(parser.usage);
     } else {
         router.connectAuthService();
-        connectESLClient();
-        router.start(port : config.callFlowControl.httpPort)
+        connectESLClient(pbxController);
+        router.start(pbxController, port : config.callFlowControl.httpPort)
         .catchError(log.shout);
     }
   } catch(error, stackTrace) {
@@ -51,7 +54,7 @@ void main(List<String> args) {
   }
 }
 
-void connectESLClient() {
+void connectESLClient(Controller.PBX pbxClient) {
 
   Duration period = new Duration(seconds : 3);
   final String hostname = config.callFlowControl.eslConfig.hostname;
@@ -60,28 +63,25 @@ void connectESLClient() {
 
   log.info('Connecting to ${hostname}:${port}');
 
-  Controller.PBX.apiClient = new ESL.Connection();
-  Controller.PBX.eventClient = new ESL.Connection();
-
-  Model.CallList.instance.subscribe(Controller.PBX.eventClient.eventStream);
+  Model.CallList.instance.subscribe(pbxClient.eventClient.eventStream);
 
   //TODO: Channel-List subscriptions.
   //Model.CallList.instance.subscribeChannelEvents(Model.ChannelList.event);
 
-  Controller.PBX.eventClient.eventStream
+  pbxClient.eventClient.eventStream
     .listen(Model.ChannelList.instance.handleEvent)
-    .onDone(connectESLClient); // Reconnect
+    .onDone(() => connectESLClient (pbxClient)); // Reconnect
 
-  Model.PeerList.subscribe(Controller.PBX.eventClient.eventStream);
+  Model.PeerList.subscribe(pbxClient.eventClient.eventStream);
 
   /// Connect API client.
-  Controller.PBX.apiClient.requestStream.listen((ESL.Packet packet) {
+  pbxClient.apiClient.requestStream.listen((ESL.Packet packet) {
     switch (packet.contentType) {
       case (ESL.ContentType.Auth_Request):
         log.info('Connected to ${hostname}:${port}');
-      Controller.PBX.apiClient.authenticate(password)
-          .then((_) => Controller.PBX.loadPeers())
-          .then((_) => Controller.PBX.loadChannels()
+      pbxClient.apiClient.authenticate(password)
+          .then((_) => pbxClient.loadPeers())
+          .then((_) => pbxClient.loadChannels()
           .then((_) => Model.CallList.instance.reloadFromChannels
             (Model.ChannelList.instance)));
 
@@ -93,12 +93,12 @@ void connectESLClient() {
   });
 
   /// Connect event client.
-  Controller.PBX.eventClient.requestStream.listen((ESL.Packet packet) {
+  pbxClient.eventClient.requestStream.listen((ESL.Packet packet) {
     switch (packet.contentType) {
       case (ESL.ContentType.Auth_Request):
         log.info('Connected to ${hostname}:${port}');
-      Controller.PBX.eventClient.authenticate(password)
-          .then((_) => Controller.PBX.eventClient.event
+      pbxClient.eventClient.authenticate(password)
+          .then((_) => pbxClient.eventClient.event
              (Model.PBXEvent.requiredSubscriptions,
                 format : ESL.EventFormat.Json)
             ..catchError(log.shout));
@@ -122,8 +122,8 @@ void connectESLClient() {
     });
   }
 
-  tryConnect (Controller.PBX.apiClient);
-  tryConnect (Controller.PBX.eventClient);
+  tryConnect (pbxClient.apiClient);
+  tryConnect (pbxClient.eventClient);
 }
 
 void registerAndParseCommandlineArguments(List<String> arguments) {

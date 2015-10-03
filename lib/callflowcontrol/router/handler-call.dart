@@ -34,6 +34,9 @@ Map pickupOK(ORModel.Call call) => call.toJson();
 Map<int, ORModel.UserState> userMap = {};
 
 abstract class Call {
+
+  static Controller.PBX pbxController;
+
   /**
    * Retrieves a single call from the call list.
    */
@@ -90,7 +93,7 @@ abstract class Call {
 
 
     try {
-      await Controller.PBX.hangup(call);
+      await pbxController.hangup(call);
       Model.UserStatusList.instance.update
       (user.ID, ORModel.UserState.HandlingOffHook);
 
@@ -164,7 +167,7 @@ abstract class Call {
         .then ((OREvent.CallHangup hangupEvent) =>
               completer.complete(hangupEvent.call));
 
-    return Controller.PBX.hangup(targetCall)
+    return pbxController.hangup(targetCall)
       .then((_) {
 
         return completer.future.then((ORModel.Call hungupCall) {
@@ -266,7 +269,7 @@ abstract class Call {
     bool isSpeaking (ORModel.Call call) =>
         call.state == ORModel.CallState.Speaking;
 
-    Future parkIt (ORModel.Call call) => Controller.PBX.park(call, user);
+    Future parkIt (ORModel.Call call) => pbxController.park(call, user);
 
     /// Park all the users calls.
     try {
@@ -313,7 +316,7 @@ abstract class Call {
         event.channel.fields['Other-Leg-Unique-ID'] == uuid;
 
     Future<ORModel.Call> outboundCall =
-        Controller.PBX.eventClient.eventStream.firstWhere
+        pbxController.eventClient.eventStream.firstWhere
         (outboundCallWithUuid, defaultValue : () => null)
         .then((ESL.Event event) =>
           Model.CallList.instance.createCall(event));
@@ -323,8 +326,8 @@ abstract class Call {
     /// channel to the outbound extension.
     ORModel.Call call;
     try {
-      await Controller.PBX.transferUUIDToExtension(uuid, extension, user);
-      call = await outboundCall.timeout(new Duration (seconds : 1));
+      await pbxController.transferUUIDToExtension(uuid, extension, user);
+      call = await outboundCall.timeout(new Duration (seconds : 3));
     }
     catch (error, stackTrace) {
       final String msg = 'Failed to get call channel';
@@ -346,11 +349,11 @@ abstract class Call {
     Model.UserStatusList.instance.update(user.ID, ORModel.UserState.Speaking);
 
     try {
-      await Controller.PBX.setVariable
+      await pbxController.setVariable
           (call.channel, Controller.PBX.ownerUid, user.ID.toString());
-      await Controller.PBX.setVariable
+      await pbxController.setVariable
         (call.channel, 'reception_id', receptionID.toString());
-      await Controller.PBX.setVariable
+      await pbxController.setVariable
          (call.channel, 'contact_id', contactID.toString());
     }
     catch (error, stackTrace) {
@@ -395,7 +398,7 @@ abstract class Call {
 
       Model.UserStatusList.instance.update(user.ID, ORModel.UserState.Parking);
 
-      return Controller.PBX.park(call, user).then((_) {
+      return pbxController.park(call, user).then((_) {
         Model.UserStatusList.instance.update(
             user.ID,
             ORModel.UserState.HandlingOffHook);
@@ -537,7 +540,7 @@ abstract class Call {
 
     /// Create an agent channel
     try {
-      agentChannel = await Controller.PBX.createAgentChannel(user);
+      agentChannel = await pbxController.createAgentChannel(user);
     } catch (error, stackTrace) {
       final String msg = 'Failed to create agent channel';
       log.severe(msg, error, stackTrace);
@@ -549,7 +552,7 @@ abstract class Call {
 
     /// Channel bridging
     try {
-      await Controller.PBX.bridgeChannel(agentChannel, assignedCall);
+      await pbxController.bridgeChannel(agentChannel, assignedCall);
     }
     catch (error, stackTrace) {
       final String msg = 'Failed to bridge channels: '
@@ -560,7 +563,7 @@ abstract class Call {
       Model.UserStatusList.instance.update (user.ID, ORModel.UserState.Unknown);
 
       /// Make sure the agent channel is closed before returning a response.
-      return Controller.PBX.killChannel(agentChannel)
+      return pbxController.killChannel(agentChannel)
         .then((_) =>  _serverError(msg))
         .catchError((error, stackTrace) {
             log.severe('Failed to close agent channel', error, stackTrace);
@@ -570,7 +573,7 @@ abstract class Call {
 
     /// Tag the channel as assigned to the user.
     try {
-      await Controller.PBX.setVariable
+      await pbxController.setVariable
         (assignedCall.channel, Controller.PBX.ownerUid, user.ID.toString());
     }
     catch (error, stackTrace) {
@@ -627,7 +630,7 @@ abstract class Call {
       return Future.forEach(
           Model.CallList.instance.callsOf(
               user.ID).where((ORModel.Call call) => call.state == ORModel.CallState.Speaking),
-          (ORModel.Call call) => Controller.PBX.park(call, user)).then((_) {
+          (ORModel.Call call) => pbxController.park(call, user)).then((_) {
 
         /// Check user state. If the user is currently performing an action - or
         /// has an active channel - deny the request.
@@ -648,7 +651,7 @@ abstract class Call {
             user.ID,
             ORModel.UserState.Receiving);
 
-        return Controller.PBX.originateRecording(
+        return pbxController.originateRecording(
             receptionID,
             recordExtension,
             recordPath,
@@ -751,7 +754,7 @@ abstract class Call {
         user.ID,
         ORModel.UserState.Transferring);
 
-    return Controller.PBX.bridge(sourceCall, destinationCall).then((_) {
+    return pbxController.bridge(sourceCall, destinationCall).then((_) {
       /// Update user state.
       Model.UserStatusList.instance.update(
           user.ID,

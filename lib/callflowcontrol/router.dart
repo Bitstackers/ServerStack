@@ -92,8 +92,11 @@ void _accessLogger(String msg, bool isError) {
   }
 }
 
-Future<IO.HttpServer> start({String hostname : '0.0.0.0', int port : 4242}) {
-  _stateController = new Controller.State();
+Future<IO.HttpServer> start(Controller.PBX pbxController,
+    {String hostname : '0.0.0.0', int port : 4242}) {
+  _stateController = new Controller.State(pbxController);
+  Call.pbxController = pbxController;
+
   log.info('Starting client notifier');
 
   Notification = new Service.NotificationService
