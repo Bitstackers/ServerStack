@@ -31,9 +31,6 @@ final Logger _log = new Logger('MessageDispatcher');
 SmtpOptions options = new SmtpOptions()
   ..hostName = config.messageDispatcher.smtp.hostname
   ..port = config.messageDispatcher.smtp.port
-  ..secure = config.messageDispatcher.smtp.secure
-  ..password = config.messageDispatcher.smtp.password
-  ..username = config.messageDispatcher.smtp.username
   ..name = config.messageDispatcher.smtp.name;
 
 void main(List<String> args) {
