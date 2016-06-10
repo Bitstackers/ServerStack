@@ -58,11 +58,10 @@ abstract class PBX {
     });
   }
 
-  static Future<ESL.Reply> bgapi(String command) {
-    return apiClient.bgapi(command).then((ESL.Reply reply) {
-      log.finest('bgapi $command => ${reply.content}');
-      return reply;
-    });
+  static Future<ESL.Reply> bgapi(String command, {String jobUuid: ''}) async {
+    final ESL.Reply reply = await apiClient.bgapi(command, jobUuid: jobUuid);
+    log.finest('bgapi $command => ${reply.content}');
+    return reply;
   }
 
   /**
@@ -111,12 +110,12 @@ abstract class PBX {
    * Returns the UUID of the new channel.
    */
   static Future<String> createAgentChannel(ORModel.User user,
-      {Map<String, String> extravars: const {}}) {
+      {Map<String, String> extravars: const {}}) async {
     final int msecs = new DateTime.now().millisecondsSinceEpoch;
-    final String new_call_uuid = 'agent-${user.id}-${msecs}';
+    final String newCallUuid = 'agent-${user.id}-${msecs}';
     final String destination = 'user/${user.peer}';
 
-    _log.finest('New uuid: $new_call_uuid');
+    _log.finest('New uuid: $newCallUuid');
     _log.finest('Dialing receptionist at user/${user.peer}');
 
     final String callerIdNumber = config.callFlowControl.callerIdNumber;
@@ -126,35 +125,52 @@ abstract class PBX {
       ORPbxKey.agentChannel: true,
       'park_timeout': config.callFlowControl.agentChantimeOut,
       'hangup_after_bridge': true,
-      'origination_uuid': new_call_uuid,
+      'origination_uuid': newCallUuid,
       'originate_timeout': config.callFlowControl.agentChantimeOut,
       'origination_caller_id_name': 'Connecting...',
       'origination_caller_id_number': callerIdNumber
     }..addAll(extravars);
 
-    String variableString =
+    final String variableString =
         variables.keys.map((String key) => '$key=${variables[key]}').join(',');
 
-    return api('originate {$variableString}${destination} &park()')
-        .then((ESL.Response response) {
-      var error;
+    /// Create a subscription
+    bool jobUuidMatches(ESL.Event event) =>
+        event.eventName == Model.PBXEvent.backgroundJob &&
+        event.field('Job-UUID') == newCallUuid;
 
-      if (response.status == ESL.Response.OK) {
-        return new_call_uuid;
-      } else if (response.rawBody.contains('CALL_REJECTED')) {
-        error = new CallRejected('destination: $destination');
+    final Future<ESL.Event> subscription = eventClient.eventStream
+            .firstWhere(jobUuidMatches)
+            .timeout(
+                new Duration(seconds: config.callFlowControl.agentChantimeOut))
+        as Future<ESL.Event>;
+
+    await bgapi('originate {$variableString}${destination} &park()',
+        jobUuid: newCallUuid);
+
+    final ESL.Response response = new ESL.Response.fromPacketBody(
+        (await subscription).field('_body').trim());
+
+    if (response.status == ESL.Response.OK) {
+      return newCallUuid;
+    } else {
+      _log.warning('Bad reply from PBX: ${response.status}');
+
+      /// Call is rejected by peer
+      if (response.rawBody.contains('CALL_REJECTED')) {
+        throw new CallRejected('destination: $destination');
+
+        /// Call is not answered by peer.
       } else if (response.rawBody.contains('NO_ANSWER')) {
-        error = new NoAnswer('destination: $destination');
+        throw new NoAnswer('destination: $destination');
+
+        /// Call did not succeed for reasons beyond our comprehension.
       } else {
-        error = new PBXException('Creation of agent channel for '
+        throw new PBXException('Creation of agent channel for '
             'uid:${user.id} failed. Destination:$destination. '
             'PBX responded: ${response.rawBody}');
       }
-
-      _log.warning('Bad reply from PBX', error);
-
-      return new Future.error(error);
-    });
+    }
   }
 
   /**

@@ -46,7 +46,8 @@ String channelUUIDOfPeer(ESL.Channel channel, String peerName) {
 
   if (channelOwnedByPeer(channelName) == peerName) {
     return channel.fields['Channel-UUID'];
-  } else if (otherChannelName != null) if (channelOwnedByPeer(otherChannelName) == peerName) {
+  } else if (otherChannelName !=
+      null) if (channelOwnedByPeer(otherChannelName) == peerName) {
     return channel.fields['Other-Leg-Channel-UUID'];
   }
 
@@ -56,7 +57,8 @@ String channelUUIDOfPeer(ESL.Channel channel, String peerName) {
 /**
  * Strips the sip: and domain part from a sip contact string.
  */
-String simplePeerName(String peerName) => peerName.split('@')[0].replaceAll('sip:', '');
+String simplePeerName(String peerName) =>
+    peerName.split('@')[0].replaceAll('sip:', '');
 
 /**
  * Channel event name string constants.
@@ -71,6 +73,7 @@ abstract class ChannelEventName {
  * Event name constants
  */
 abstract class PBXEvent {
+  static const String backgroundJob = 'BACKGROUND_JOB';
   static const String CUSTOM = 'CUSTOM';
   static const String CHANNEL_ANSWER = 'CHANNEL_ANSWER';
   static const String CHANNEL_BRIDGE = 'CHANNEL_BRIDGE';
@@ -93,6 +96,7 @@ abstract class PBXEvent {
     CHANNEL_ANSWER,
     RECORD_START,
     RECORD_STOP,
+    backgroundJob,
     CUSTOM,
     SOFIA_REGISTER,
     SOFIA_UNREGISTER,
@@ -159,14 +163,16 @@ class ChannelList extends ESL.ChannelList {
   /**
    * Determine if a peer has any active channels.
    */
-  bool hasActiveChannels(String peerID) =>
-      this.any((ESL.Channel channel) => simplePeerName(ownedByPeer(channel)) == peerID);
+  bool hasActiveChannels(String peerID) => this.any(
+      (ESL.Channel channel) => simplePeerName(ownedByPeer(channel)) == peerID);
 
   /**
    * Determine the number of active channels a peer has.
    */
-  int activeChannelCount(String peerID) =>
-      this.where((ESL.Channel channel) => simplePeerName(ownedByPeer(channel)) == peerID).length;
+  int activeChannelCount(String peerID) => this
+      .where((ESL.Channel channel) =>
+          simplePeerName(ownedByPeer(channel)) == peerID)
+      .length;
 
   /**
    * Updates, removes or adds a channel, based on the state of [channel].
