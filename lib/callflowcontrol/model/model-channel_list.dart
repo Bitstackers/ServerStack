@@ -130,7 +130,7 @@ class ChannelEvent {
 
   Map get asMap => {
         'eventName': this.eventName,
-        'channelID': this.channel.UUID,
+        'channelID': this.channel.uuid,
         'ownerPeer': this.ownerPeer,
         'external': this.isExternalChannel
       };
