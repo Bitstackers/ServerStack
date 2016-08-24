@@ -10,9 +10,8 @@ dependencies:
       url: https://github.com/Bitstackers/emailer.git
   esl:
     git:
-      ref: devel
+      ref: 1702b3883479d59d3143789e9cae9b9796266d0f
       url: https://github.com/rostgaard/libesl-dart.git
-    version: '>0.0.17 <0.0.22'
   http: any
   intl: any
   logging: any
