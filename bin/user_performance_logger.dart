@@ -23,6 +23,7 @@ import 'dart:convert';
 import '../lib/configuration.dart';
 
 import 'package:openreception_framework/event.dart' as event;
+import 'package:intl/intl.dart';
 
 import 'package:openreception_framework/model.dart' as model;
 
@@ -235,12 +236,26 @@ Future main(List<String> args) async {
   }
 
   String jsonCache = '';
-  new Timer.periodic(new Duration(seconds: 10), (_) {
+  DateTime lastTime = new DateTime.now();
+  new Timer.periodic(new Duration(seconds: 1), (_) {
     final newCache = JSON.encode(_summarize(_eventHistory).toJson());
 
     if (newCache.hashCode != jsonCache.hashCode) {
       jsonCache = newCache;
+
+      if (new DateTime.now().day != lastTime.day) {
+        print('Day changed, clearing totals');
+        final DateFormat _format = new DateFormat('yyyyMMdd');
+        final String filename = _format.format(lastTime) + '.agentstats.json';
+
+        new File(filename).writeAsStringSync(jsonCache);
+        jsonCache = '';
+        _eventHistory.clear();
+      }
+
       new File('/tmp/agentstats.json').writeAsStringSync(jsonCache);
     }
+
+    lastTime = new DateTime.now();
   });
 }
