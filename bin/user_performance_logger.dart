@@ -235,27 +235,29 @@ Future main(List<String> args) async {
     });
   }
 
-  String jsonCache = '';
+  String jsonCache = JSON.encode(_summarize(_eventHistory).toJson());
   DateTime lastTime = new DateTime.now();
   new Timer.periodic(new Duration(seconds: 1), (_) {
     final newCache = JSON.encode(_summarize(_eventHistory).toJson());
+    final DateTime now = new DateTime.now();
+
+    if (now.day != lastTime.day) {
+      print('Day changed, clearing totals');
+      final DateFormat _format = new DateFormat('yyyyMMdd');
+      final String filename = _format.format(lastTime) + '.agentstats.json';
+
+      new File(filename).writeAsStringSync(newCache);
+
+      _eventHistory.clear();
+      jsonCache = JSON.encode(_summarize(_eventHistory).toJson());
+    }
 
     if (newCache.hashCode != jsonCache.hashCode) {
       jsonCache = newCache;
 
-      if (new DateTime.now().day != lastTime.day) {
-        print('Day changed, clearing totals');
-        final DateFormat _format = new DateFormat('yyyyMMdd');
-        final String filename = _format.format(lastTime) + '.agentstats.json';
-
-        new File(filename).writeAsStringSync(jsonCache);
-        jsonCache = '';
-        _eventHistory.clear();
-      }
-
       new File('/tmp/agentstats.json').writeAsStringSync(jsonCache);
     }
 
-    lastTime = new DateTime.now();
+    lastTime = now;
   });
 }
