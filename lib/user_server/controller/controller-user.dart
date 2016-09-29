@@ -207,7 +207,7 @@ class User {
     try {
       return _okJson(await _userStore.getByIdentity(identity));
     } on storage.NotFound catch (error) {
-      _notFound(error.toString());
+      return _notFound(error.toString());
     }
   }
 

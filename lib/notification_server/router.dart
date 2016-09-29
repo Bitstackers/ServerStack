@@ -32,6 +32,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_route/shelf_route.dart' as shelf_route;
 import 'package:shelf_web_socket/shelf_web_socket.dart' as sWs;
 import 'package:shelf_cors/shelf_cors.dart' as shelf_cors;
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 part 'router/notification.dart';
 
