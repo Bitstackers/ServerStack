@@ -220,20 +220,38 @@ Future main(List<String> args) async {
     }
   });
 
-  if (args.isNotEmpty) {
-    List<String> lines = await new File(args.first).readAsLines();
+  void processFile(String filename) {
+    final File f = new File(filename);
 
-    lines.forEach((String line) {
-      Map json = JSON.decode(line);
-      event.Event e = new event.Event.parse(json);
-      try {
-        dispatchEvent(e);
-      } catch (e, s) {
-        print(e);
-        print(s);
+    if (f.existsSync()) {
+      print('Processing file $filename');
+      final List<String> lines = f.readAsLinesSync();
+
+      for (String line in lines) {
+        try {
+          Map json = JSON.decode(line);
+          event.Event e = new event.Event.parse(json);
+          dispatchEvent(e);
+        } catch (e, s) {
+          print(e);
+          print(s);
+        }
       }
-    });
+    } else {
+      print('Skipping processing of non-existing file $filename');
+    }
   }
+
+  // Load specific event dump file files
+  if (args.isNotEmpty) {
+    for (String filename in args) {
+      processFile(filename);
+    }
+  }
+
+  /// Load and process daily dump
+  processFile(
+      new DateFormat('yyyyMMdd').format(new DateTime.now()) + '.eventdump');
 
   String jsonCache = JSON.encode(_summarize(_eventHistory).toJson());
   DateTime lastTime = new DateTime.now();
