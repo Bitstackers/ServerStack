@@ -49,6 +49,7 @@ RandomAccessFile _openFile(DateTime date) {
   final File file = new File(filename);
 
   if (!file.existsSync()) {
+    print('Creating new event dump file ${file.path}');
     file.createSync();
   }
 
