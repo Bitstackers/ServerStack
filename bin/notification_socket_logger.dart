@@ -18,10 +18,13 @@ library openreception.authentication_server;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import '../lib/configuration.dart';
 
+import 'package:intl/intl.dart';
 import 'package:openreception_framework/service.dart' as service;
+import 'package:openreception_framework/event.dart' as event;
 import 'package:openreception_framework/service-io.dart' as transport;
 
 Future main(List<String> args) async {
@@ -32,7 +35,22 @@ Future main(List<String> args) async {
   service.NotificationSocket notificationSocket =
       new service.NotificationSocket(client);
 
-  notificationSocket.eventStream.listen((event) {
-    print(JSON.encode(event));
+  notificationSocket.eventStream.listen((event.Event e) async {
+    final file = _openFile(e.timestamp);
+
+    await file.writeString(JSON.encode(e));
   });
+}
+
+final DateFormat _format = new DateFormat('yyyyMMdd');
+
+RandomAccessFile _openFile(DateTime date) {
+  final String filename = _format.format(date) + '.eventdump';
+  final File file = new File(filename);
+
+  if (!file.existsSync()) {
+    file.createSync();
+  }
+
+  return file.openSync(mode: FileMode.APPEND);
 }
